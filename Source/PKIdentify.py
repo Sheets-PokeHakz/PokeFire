@@ -39,7 +39,7 @@ class Pokefier:
         return predicted_pokemon
 
     def _initialize_interpreter(self):
-        tflite_model_path = 'Source/pokefier.tflite'
+        tflite_model_path = 'Source/Pokefier.tflite'
         interpreter = tf.lite.Interpreter(model_path=tflite_model_path)
         interpreter.allocate_tensors()
         return interpreter
