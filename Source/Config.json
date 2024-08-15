@@ -2,7 +2,7 @@
     "TOKENS": [],
 
     "LOGGING": 1, 
-    "OWNER_ID": 69,
+    "OWNER_ID": 100, 
 
     "WEBHOOK_URL": "",
     "LANGUAGES": ["english"],
