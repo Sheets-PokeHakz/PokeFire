@@ -442,6 +442,8 @@ async def run_autocatcher(token):
             is_spawn_message(message, bot.whitelisted_channels, POKETWO_ID)
             and bot.verified
         ):
+            
+            print("[?] A Pokémon Spawned")
 
             await spam_loop.stop()
 
