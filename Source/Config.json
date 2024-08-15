@@ -1,0 +1,20 @@
+{
+    "TOKENS": [],
+
+    "LOGGING": 1, 
+    "OWNER_ID": 69,
+
+    "WEBHOOK_URL": "",
+    "LANGUAGES": ["english"],
+
+    "BLACKLISTED_POKEMONS": [],
+    "WHITELISTED_CHANNELS": [],
+
+    "SPAM": {
+        "ENABLED": "False", 
+        "TIMING": [3, 3.1, 3.4, 3.5, 3.6, 3.7, 3.8,3.9, 4],
+        "SPAM_ID": 0
+    },
+
+    "POKETWO_ID": 716390085896962058
+}
