@@ -17,6 +17,14 @@ def send_log(embed, WEBHOOK_URL):
     webhook.add_embed(embed)
     webhook.execute()
 
+def is_shard_buy_message(message, whitelisted_channels, POKETWO_ID):
+    
+    return (
+        message.author.id == POKETWO_ID
+        and message.channel.id in whitelisted_channels
+        and "Are you sure you want to exchange".lower() in message.content.lower()
+    )
+
 
 def is_spawn_message(message, whitelisted_channels, POKETWO_ID):
 

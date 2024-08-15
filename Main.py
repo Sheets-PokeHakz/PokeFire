@@ -239,15 +239,9 @@ async def run_autocatcher(token):
     @bot.command()
     async def shardbuy(ctx, amt: int):
 
-        if ctx.author.id != OWNER_ID:
+        if ctx.author.id == OWNER_ID:
             if amt > 0:
-                await ctx.send(f"<@{POKETWO_ID}> shard buy {amt}")
-
-                resp = await bot.wait_for(
-                    "message", check=lambda m: m.author.id == "716390085896962058"
-                )
-                await resp.components[0].children[0].click()
-
+                await ctx.send(f"<@{POKETWO_ID}> buy shards {amt}")
         else:
             await ctx.send(
                 f"Invalid Usage. Correct Usage : `{bot.command_prefix}shardbuy <amount>`"
@@ -437,6 +431,16 @@ async def run_autocatcher(token):
     async def on_message(message):
 
         await bot.process_commands(message)
+
+        if (
+            is_shard_buy_message(message, bot.whitelisted_channels, POKETWO_ID)
+            and bot.verified
+        ):
+
+            print("[?] A Shard Buy Message Received")
+
+            await message.components[0].children[0].click()
+
 
         if (
             is_spawn_message(message, bot.whitelisted_channels, POKETWO_ID)
