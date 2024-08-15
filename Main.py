@@ -136,7 +136,7 @@ async def run_autocatcher(token):
     enabled = SPAM
     interval = INTERVAL
 
-    @tasks.loop(seconds=interval)
+    @tasks.loop(seconds=random.choice(interval))
     async def spam_loop():
 
         if bot.verified and enabled == "True" and SPAM_ID:
