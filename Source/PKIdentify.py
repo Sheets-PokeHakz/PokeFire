@@ -4,7 +4,7 @@ import tensorflow as tf
 
 class Pokefier:
     def __init__(self):
-        self.labels = eval(open('Soucre/Names.txt', 'r').read())
+        self.labels = eval(open('Source/Names.txt', 'r').read())
         self.interpreter_pool = [self._initialize_interpreter() for _ in range(5)]
 
     def _remove_alpha_channel(self, image):
