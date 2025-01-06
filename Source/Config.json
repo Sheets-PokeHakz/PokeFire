@@ -1,20 +1,22 @@
 {
-    "TOKENS": ["TOKEN 1", "TOKEN 2"],
+  "TOKENS": [""],
 
-    "LOGGING": 1, 
-    "OWNER_ID": 100, 
+  "LOGGING": 1,
+  "OWNER_ID": 100,
 
-    "WEBHOOK_URL": "",
-    "LANGUAGES": ["english"],
+  "WEBHOOK_URL": "",
+  "LANGUAGES": ["english"],
 
-    "BLACKLISTED_POKEMONS": [],
-    "WHITELISTED_CHANNELS": [],
+  "BLACKLISTED_POKEMONS": [],
+  "WHITELISTED_CHANNELS": [1099716491705851984, 1150237350513885194],
 
-    "SPAM": {
-        "ENABLED": "False", 
-        "TIMING": [3.0, 3.1, 3.4, 3.5, 3.6, 3.7, 3.8,3.9, 4.0],
-        "SPAM_ID": 0
-    },
+  "SPAM": {
+    "ENABLED": "False",
+    "TIMING": [3.0, 3.1, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0],
+    "SPAM_ID": 0
+  },
 
-    "POKETWO_ID": 716390085896962058
+  "POKETWO_ID": 716390085896962058,
+
+  "DELAY": [1.0, 1.4, 1.8, 2.2, 2.6, 3.0]
 }
