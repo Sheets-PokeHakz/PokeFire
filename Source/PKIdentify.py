@@ -2,9 +2,10 @@ import aiohttp
 import numpy as np
 import tensorflow as tf
 
+
 class Pokefier:
     def __init__(self):
-        self.labels = eval(open('Source/Names.txt', 'r').read())
+        self.labels = eval(open("Source/Names.txt", "r").read())
         self.interpreter_pool = [self._initialize_interpreter() for _ in range(5)]
 
     def _remove_alpha_channel(self, image):
@@ -31,7 +32,9 @@ class Pokefier:
         preprocessed_image = await self._prepare_image_for_prediction(image_url)
 
         # Predict Teh Pokemon Lable
-        predicted_pokemon = await self._predict_pokemon(interpreter, [preprocessed_image.numpy()])
+        predicted_pokemon = await self._predict_pokemon(
+            interpreter, [preprocessed_image.numpy()]
+        )
 
         # Return The Interpreter To The Pool
         self._return_interpreter_to_pool(interpreter)
@@ -39,7 +42,7 @@ class Pokefier:
         return predicted_pokemon
 
     def _initialize_interpreter(self):
-        tflite_model_path = 'Source/Pokefire.tflite'
+        tflite_model_path = "Source/Pokefire.tflite"
         interpreter = tf.lite.Interpreter(model_path=tflite_model_path)
         interpreter.allocate_tensors()
         return interpreter
@@ -55,17 +58,18 @@ class Pokefier:
         output_details = interpreter.get_output_details()
 
         input_data = tf.convert_to_tensor(image, dtype=tf.float32)
-        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.set_tensor(input_details[0]["index"], input_data)
 
         interpreter.invoke()
 
-        output_data = interpreter.get_tensor(output_details[0]['index'])
-        predicted_class_index = np.argmax(output_data)
-        predicted_label = self.labels[predicted_class_index]
+        output_data = interpreter.get_tensor(output_details[0]["index"])
 
         # Get Prediction Score And Create Tuple
         prediction_scores = output_data[0]
-        predictions = [(self.labels[i], round(score * 100, 1)) for i, score in enumerate(prediction_scores)]
+        predictions = [
+            (self.labels[i], round(score * 100, 1))
+            for i, score in enumerate(prediction_scores)
+        ]
 
         # Sort Predictions By Score
         predictions.sort(key=lambda x: x[1], reverse=True)
