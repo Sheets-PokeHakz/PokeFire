@@ -1,27 +1,65 @@
 # System Modules
 import time
-import string
+import json
 import random
-import discord
 import asyncio
-import concurrent.futures
+import logging
 
 # Discord Modules
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord_webhook import DiscordEmbed
 
 # Pokefire Modules
-from Source.CatptchaSolver import verify
-from Source.PKIdentify import Pokefier
-from Source.Utilities import *
+from source.PKIdentify import Pokefier
+from source.Utilities import (
+    extract_pokemon_data,
+    load_pokemon_data,
+    remove_diacritics,
+    read_config,
+    send_log,
+    solve,
+)
 
 # Initialize Pokefier Instance
 pokefier = Pokefier()
 
+# ========================================== LOGGING ========================================= #
+
+# Defining The Basic logger.info Message For logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Defining The Logger
+logger = logging.getLogger(__name__)
+
+
+# Defining The Log Message Function
+def log_message(level, message):
+    if level == "info":
+        logger.info(message)
+    elif level == "warning":
+        logger.warning(message)
+    elif level == "error":
+        logger.error(message)
+    elif level == "debug":
+        logger.debug(message)
+    else:
+        logger.info(message)
+
+
+logger.info("Initialized Logging")
+
 # ========================================== CONFIG ========================================== #
 
+# Reading The Config File
 config = read_config()
+logger.info("Initialized Config")
 
+# Defining The Config Variables
+DELAY = config["DELAY"]
 TOKENS = config["TOKENS"]
 
 LOGGING = config["LOGGING"]
@@ -37,27 +75,10 @@ WEBHOOK_URL = config["WEBHOOK_URL"]
 BLACKLISTED_POKEMONS = config["BLACKLISTED_POKEMONS"]
 WHITELISTED_CHANNELS = config["WHITELISTED_CHANNELS"]
 
-# ========================================== HINT ========================================== #
-
-with open("Source/Pokemon", "r", encoding="utf8") as file:
-    pokemon_list = file.read()
-
-
-def solve(message):
-    hint = []
-    for i in range(15, len(message) - 1):
-        if message[i] != "\\":
-            hint.append(message[i])
-    hint_string = "".join(hint)
-    hint_replaced = hint_string.replace("_", ".")
-    return re.findall("^" + hint_replaced + "$", pokemon_list, re.MULTILINE)
-
-
 # ========================================== SPAM ========================================== #
 
 
 def spam():
-
     with open("Messages/Messages.txt", "r", encoding="utf-8", errors="ignore") as file:
         messages = file.readlines()
 
@@ -81,10 +102,6 @@ class Autocatcher(commands.Bot):
         self.whitelisted_channels = WHITELISTED_CHANNELS
         self.blacklisted_pokemons = BLACKLISTED_POKEMONS
 
-    async def solve_captcha(self):
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            return await asyncio.to_thread(verify, self)
-
     async def get_alternate_pokemon_name(self, name, languages=LANGUAGES):
         pokemon = next(
             (p for p in self.pokemon_data if p["name"].lower() == name.lower()), None
@@ -107,124 +124,35 @@ class Autocatcher(commands.Bot):
 
 
 async def run_autocatcher(token):
-
     bot = Autocatcher()  # Initialize Bot
 
     @bot.event
     async def on_ready():
-
-        print("+ ============== Pokefier ============== +")
-        print(f"+ Logged In : {bot.user} (ID: {bot.user.id})")
-        print("+ ============== Config ================ +")
-        print(f"+ Languages: {bot.languages}")
-        print(f"+ Whitelisted Channels: {bot.whitelisted_channels}")
-        print(f"+ Blacklisted Pokemons: {bot.blacklisted_pokemons}")
-        print("+ ====================================== +")
+        logger.info("+ ============== Pokefier ============== +")
+        logger.info(f"+ Logged In : {bot.user} (ID: {bot.user.id})")
+        logger.info("+ ============== Config ================ +")
+        logger.info(f"+ Languages: {bot.languages}")
+        logger.info(f"+ Whitelisted Channels: {bot.whitelisted_channels}")
+        logger.info(f"+ Blacklisted Pokemons: {bot.blacklisted_pokemons}")
+        logger.info("+ ====================================== +")
 
         bot.started = time.time()  # Stats The Time
         bot.command_prefix = f"<@{bot.user.id}> "  # Set Command Prefix
 
-        print(f"+ Bot Prefix: {bot.command_prefix}")
+        logger.info(f"+ Bot Prefix: {bot.command_prefix}")
 
         bot.verified = True  # Set Verified ( If False Bot Will Not Catch Pokemon)
         bot.pokemons_caught = 0  # Set Global Pokemon Counter To 0
 
-        await spam_loop.start()
-
     # ========================================== SPAM TASKS ========================================== #
-
-    enabled = SPAM
-    interval = INTERVAL
-
-    @tasks.loop(seconds=random.choice(interval))
-    async def spam_loop():
-
-        if bot.verified and enabled == "True" and SPAM_ID:
-            channel = bot.get_channel(SPAM_ID)
-            await channel.send(spam())
-
-    @bot.command()
-    async def start(ctx):
-
-        if ctx.author.id == OWNER_ID:
-            await spam_loop.start()
-
-            embed = DiscordEmbed(title="Spamming Started", color="046e1f")
-            embed.set_author(
-                name="Pokefier",
-                icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
-            )
-
-            await send_log(embed=embed)
-
-            data = read_config()
-            data["SPAM"]["ENABLED"] = "True"
-
-            with open("Source/Config.json", "w") as file:
-                json.dump(data, file, indent=4)
-
-            await ctx.send("I am working hard dude")
-
-        else:
-
-            embed = DiscordEmbed(
-                title="Nah Sorry Bro",
-                description="Only Owners Can Use It",
-                color="046e1f",
-            )
-            embed.set_author(
-                name="Pokefier",
-                icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
-            )
-
-            await send_log(embed=embed)
-            await ctx.send("# You Are Not My Owner")
-
-    @bot.command()
-    async def stop(ctx):
-
-        if ctx.author.id == OWNER_ID:
-            await spam_loop.stop()
-
-            embed = DiscordEmbed(title="Spamming Stopped", color="046e1f")
-            embed.set_author(
-                name="Pokefier",
-                icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
-            )
-
-            await send_log(embed=embed)
-
-            data = read_config()
-            data["SPAM"]["ENABLED"] = "False"
-
-            with open("Source/Config.json", "w") as file:
-                json.dump(data, file, indent=4)
-
-            await ctx.send("I am taking a break dude")
-
-        else:
-            embed = DiscordEmbed(
-                title="Nah Sorry Bro",
-                description="Only Owners Can Use It",
-                color="046e1f",
-            )
-            embed.set_author(
-                name="Pokefier",
-                icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
-            )
-
-            await send_log(embed=embed)
-            await ctx.send("# You Are Not My Owner")
 
     @bot.command()
     async def ping(ctx):
-
         await ctx.send("Pong!")
         await ctx.send(f"Latency : {round(bot.latency * 1000)}ms")
 
     @bot.command()
     async def incense(ctx, time: str, inter: str):
-
         if ctx.author.id != OWNER_ID:
             if time in ["30m", "1h", "3h", "1d"] and inter in ["10s", "20s", "30s"]:
                 await ctx.send(f"<@{POKETWO_ID}> incense buy {time} {inter} -y")
@@ -238,7 +166,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def shardbuy(ctx, amt: int):
-
         if ctx.author.id == OWNER_ID:
             if amt > 0:
                 await ctx.send(f"<@{POKETWO_ID}> buy shards {amt}")
@@ -249,7 +176,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def channeladd(ctx, *channel_ids):
-
         if not channel_ids:
             await ctx.reply(
                 "`You Must Provide Atleast One Channel ID. Separate Multiple IDs With Spaces.`"
@@ -278,7 +204,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def channelremove(ctx, *channel_ids):
-
         if not channel_ids:
             await ctx.reply(
                 "`You Must Provide Atleast One Channel ID. Separate Multiple IDs With Spaces.`"
@@ -309,7 +234,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def languageadd(ctx, *languages):
-
         if not languages:
             await ctx.reply(
                 "`You Must Provide Atleast One Language. Separate Multiple Languages With Spaces.`"
@@ -337,7 +261,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def languageremove(ctx, *languages):
-
         if not languages:
             await ctx.reply(
                 "`You Must Provide Atleast One Language. Separate Multiple Languages With Spaces.`"
@@ -365,7 +288,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def blacklistadd(ctx, *pokemons):
-
         if not pokemons:
             await ctx.reply(
                 "`You Must Provide Atleast One Pokemon. Separate Multiple Pokemons With Spaces.`"
@@ -389,7 +311,6 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def blacklistremove(ctx, *pokemons):
-
         if not pokemons:
             await ctx.reply(
                 "`You Must Provide Atleast One Pokemon. Separate Multiple Pokemons With Spaces.`"
@@ -415,13 +336,11 @@ async def run_autocatcher(token):
 
     @bot.command()
     async def config(ctx):
-
         message = f"```PREFIX: {bot.command_prefix}\nOWNER_ID: {OWNER_ID}\n\nWHITELISTED_CHANNELS = {bot.whitelisted_channels}\nBLACKLISTED_POKEMONS={bot.blacklisted_pokemons}\n\nLANGUAGES = {bot.languages}```"
         await ctx.reply(message)
 
     @bot.command()
     async def say(ctx, *, message):
-
         if ctx.message.author.id != OWNER_ID:
             return
         else:
@@ -429,118 +348,172 @@ async def run_autocatcher(token):
 
     @bot.event
     async def on_message(message):
-
         await bot.process_commands(message)
 
+        # ========================================== TRADE HANDLING ========================================== #
+
         if (
-            is_shard_buy_message(message, bot.whitelisted_channels, POKETWO_ID)
-            and bot.verified
+            message.author.id == POKETWO_ID
+            and message.channel.id in bot.whitelisted_channels
         ):
+            # Stop Spamming
 
-            print("[?] A Shard Buy Message Received")
+            logger.info("Message Received From POKETWO")
+            logger.info("Attempting To Process Message")
 
-            await message.components[0].children[0].click()
+            # Trade Accept
+            if "requesting a trade with" in message.content.lower():
+                logger.info("Trade Request Received")
 
+                if (
+                    message.components[0].children[0].label.lower() == "accept"
+                ):  # Checking If Accept Button Is Present
+                    await time.sleep(
+                        random.choice(DELAY)
+                    )  # Delay Before Accepting Trade For Human Replication
+                    await (
+                        message.components[0].children[0].click()
+                    )  # Clicking The Accept Button
 
-        if (
-            is_spawn_message(message, bot.whitelisted_channels, POKETWO_ID)
-            and bot.verified
-        ):
-            
-            print("[?] A Pokémon Spawned")
+                logger.info("Trade Accepted")
+                # Start Spamming
 
-            await spam_loop.stop()
+            # Trade Confirmation
+            if message.embeds:
+                if (
+                    "are you sure you want to confirm this trade? please make sure that you are trading what you intended to."
+                    in message.embeds[0].description.lower()
+                ):
+                    logger.info("Trade Confirmation Received")
 
-            pokemon_image = message.embeds[0].image.url
-            predicted_pokemons = await pokefier.predict_pokemon_from_url(pokemon_image)
+                    if (
+                        message.components[0].children[0].label.lower() == "confirm"
+                    ):  # Checking If Confirm Button Is Present
+                        await time.sleep(
+                            random.choice(DELAY)
+                        )  # Delay Before Confirming Trade For Human Replication
+                        await (
+                            message.components[0].children[0].click()
+                        )  # Clicking The Confirm Button
 
-            predicted_pokemon = max(predicted_pokemons, key=lambda x: x[1])
+                    logger.info("Trade Completed")
+                    # Start Spamming
 
-            name = predicted_pokemon[0]
-            score = predicted_pokemon[1]
+        # ========================================== SHARDS HANDLING ========================================== #
 
-            bot.blacklisted_pokemons = [
-                pokemon_name.lower() for pokemon_name in bot.blacklisted_pokemons
-            ]
+        if "are you sure you want to exchange" in message.content.lower():
+            # Stop Spamming
 
-            if name.lower() in bot.blacklisted_pokemons:
-                print(f"[?] Pokémon : {name} Was Not Caught Because It Is Blacklisted")
-                return
+            logger.info("A Shard Buy Message Received")
 
-            if score > 30.0:
-                alt_name = await bot.get_alternate_pokemon_name(
-                    name, languages=bot.languages
-                )
-                alt_name = remove_diacritics(alt_name)
+            if (
+                message.components[0].children[0].label.lower() == "confirm"
+            ):  # Checking If Confirm Button Is Present
+                await time.sleep(
+                    random.choice(DELAY)
+                )  # Delay Before Confirming Trade For Human Replication
+                await (
+                    message.components[0].children[0].click()
+                )  # Clicking The Confirm Button
 
-                await message.channel.send(f"<@716390085896962058> c {alt_name}")
+            logger.info("Shard Bought")
+            # Start Spamming
 
-        if (
-            is_captcha_message(
-                message, bot.whitelisted_channels, bot.user.id, POKETWO_ID
+        if "you don't have enough shards" in message.content.lower():
+            # Stop Spamming
+
+            logger.info("Not Enough Shards To Buy Incense")
+
+            await message.channel.send("Not Enough Shards To Buy Incense")
+            await message.channel.send(
+                f"To Buy Shards Use `{bot.command_prefix}shardbuy <amount>`"
             )
-            and bot.verified
-        ):
-            print("[?] A Captcha Challenge Was Received")
+            # Start Spamming
 
-            await spam_loop.stop()
+        # ========================================== SPAWN HANDLING ========================================== #
 
-            bot.verified = False
-            started = time.time()
-            await bot.solve_captcha()
+        incense = ""
+        remaning_spawns = ""
+        spawn_interval = ""
+        time_left = ""
 
-            if LOGGING == 1:
-                elapsed = convert_seconds(round((time.time() - started)))
-                uptime = convert_seconds(round(time.time() - bot.started))
+        if message.embeds:
+            if (
+                "wild" in message.embeds[0].title.lower() and bot.verified
+            ):  # Checking If Pokémon Spawned And Bot Is Verified
+                logger.info("A Pokémon Spawned - Attemping To Predict")
 
-                embed = DiscordEmbed(title="A Captcha Was Solved!", color="046e1f")
-                embed.set_description(
-                    f"Account Name : {bot.user.name}\n\nTime Taken : {elapsed}\nAccount Uptime : {uptime}"
-                )
-                embed.set_author(
-                    name="Pokefier",
-                    url="https://github.com/sayaarcodes/pokefier",
-                    icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
-                )
+                # Stop Spamming
 
-                send_log(embed, WEBHOOK_URL)
+                if message.embeds[0].footer.text:
+                    footer = message.embeds[0].footer.text
 
-        if (
-            not_enough_sahards(
-                message, bot.whitelisted_channels, bot.user.id, POKETWO_ID
+                    footer.split("\n")
+                    incense = footer[0]
+                    remaning_spawns = footer[1]
+                    spawn_interval = footer[2]
+                    time_left = footer[3].split("at")[0]
+
+                pokemon_image = message.embeds[
+                    0
+                ].image.url  # Get The Image URL Of The Pokémon
+                predicted_pokemons = await pokefier.predict_pokemon_from_url(
+                    pokemon_image
+                )  # Predict The Pokémon Using Pokefier
+
+                predicted_pokemon = max(
+                    predicted_pokemons, key=lambda x: x[1]
+                )  # Get The Pokémon With Highest Score
+
+                name = predicted_pokemon[0]  # Get The Name Of The Pokémon
+                score = predicted_pokemon[1]  # Get The Score Of The Pokémon
+
+                bot.blacklisted_pokemons = [
+                    pokemon_name.lower() for pokemon_name in bot.blacklisted_pokemons
+                ]  # Get The Blacklisted Pokemons
+
+                if name.lower() in bot.blacklisted_pokemons:
+                    logger.info(
+                        f"Pokémon : {name} Was Not Caught Because It Is Blacklisted"
+                    )
+                    return
+
+                if score > 30.0:  # 30 Is The Threshold Score
+                    alt_name = await bot.get_alternate_pokemon_name(
+                        name, languages=bot.languages
+                    )
+                    alt_name = remove_diacritics(alt_name)
+
+                    await message.channel.send(f"<@716390085896962058> c {alt_name}")
+                    logger.info(f"Predicted Pokémon : {name} With Score : {score}")
+
+                else:
+                    logger.info(f"Predicted Pokémon : {name} With Score : {score}")
+
+        if "that is the wrong pokémon" in message.content.lower() and bot.verified:
+            # Stop Spamming
+
+            logger.info("Wrong Pokémon Detected")
+            await message.channel.send("<@716390085896962058> h")
+
+            logger.info("Requested Hint For Wrong Pokémon")
+
+        if "the pokémon is" in message.content.lower() and bot.verified:
+            logger.info("Solving The Hint")
+            await message.channel.send(
+                "<@716390085896962058> c {}".format(solve(message.content))
             )
-            and bot.verified
-        ):
 
-            await spam_loop.stop()
+            logger.info("Hint Solved")
 
-            print("[?] Not Enough Shards To Buy Incense")
+        # ========================================== CATCH LOG HANDLING ========================================== #
+        incense = False
+        remaning_spawns = ""
+        spawn_interval = ""
+        time_left = ""
 
-            await message.channel.send(f"Not Enough Shards To Buy Incense")
-            await message.channel.send(f"To Buy Shards Use `{bot.command_prefix}shardbuy <amount>`")
-
-        if (
-            is_pokemon_wrong(message, bot.whitelisted_channels, bot.user.id, POKETWO_ID)
-            and bot.verified
-        ):
-
-            await spam_loop.stop()
-
-            hint = solve(message.content)
-
-            if hint:
-                await message.channel.send(f"<@{POKETWO_ID}> c {hint[0]}")
-
-        if (
-            is_pokemon_caught_message(
-                message, bot.whitelisted_channels, bot.user.id, POKETWO_ID
-            )
-            and LOGGING == 1
-        ):
+        if "congratulations" in message.content.lower() and bot.verified:
             bot.pokemons_caught += 1
-
-            if SPAM == "True":
-                await spam_loop.start()
 
             is_shiny = False
             if "these colors" in message.content.lower():
@@ -556,27 +529,62 @@ async def run_autocatcher(token):
                 None,
             )
 
-            embed = DiscordEmbed(title="A Pokemon Was Caught!", color="03b2f8")
-            embed.set_description(
+            embed1 = DiscordEmbed(title="A Pokemon Was Caught!", color="03b2f8")
+            embed1.set_description(
                 f"Account Name : {bot.user.name}\n\nPokémon Name : {pokemon_data['name']}\n\nPokémon Level : {pokemon_data['level']}\nPokémon IV : {pokemon_data['IV']}%\n\nShiny : {is_shiny}\nRarity : {pokemon['rarity']}\n\nPokémons Caught : {bot.pokemons_caught}"
             )
-            embed.set_author(
+            embed1.set_author(
                 name="Pokefier",
                 url="https://github.com/sayaarcodes/pokefier",
                 icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
             )
-            embed.set_thumbnail(url=pokemon["image"]["url"])
-            embed.set_timestamp()
+            embed1.set_thumbnail(url=pokemon["image"]["url"])
+            embed1.set_timestamp()
 
-            send_log(embed, WEBHOOK_URL)
+            if incense.lower() == "Incense: Active.".lower():
+                embed2 = DiscordEmbed(title="Incense Details", color="03b2f8")
+                embed2.set_description(
+                    f"Remaining Spawns : {remaning_spawns}\nSpawn Interval : {spawn_interval}\nTime Left : {time_left}"
+                )
+
+                embed2.set_author(
+                    name="Pokefier",
+                    url="https://github.com/sayaarcodes/pokefier",
+                    icon_url="https://raw.githubusercontent.com/sayaarcodes/pokefier/main/pokefier.png",
+                )
+
+                embed2.set_thumbnail(url=pokemon["image"]["url"])
+                embed2.set_timestamp()
+
+                await send_log(embed=embed2, WEBHOOK_URL=WEBHOOK_URL)
+
+            await send_log(embed=embed1, WEBHOOK_URL=WEBHOOK_URL)
+
+        # ========================================== CAPTCHA HANDLING ========================================== #
+
+        if (
+            f"https://verify.poketwo.net/captcha/{bot.user.id}" in message.content
+            and bot.verified
+        ):
+            logger.info("A Captcha Challenge Was Received")
+            # Stop Spamming
+
+            bot.verified = False
+            await message.channel.send("<@716390085896962058> incense pause")
+            logger.info("Incense Paused")
+
+            owner_dm = await bot.fetch_user(OWNER_ID)
+            await owner_dm.send(
+                f"Captcha Challenge Received. Please Solve It.\n\n{message.content}"
+            )
+            logger.info("Captcha Challenge Sent To Owner")
 
     await bot.start(token)
 
 
 async def main(tokens):
-
-    tasks = [run_autocatcher(token) for token in tokens]
-    await asyncio.gather(*tasks)
+    ac_tasks = [run_autocatcher(token) for token in tokens]
+    await asyncio.gather(*ac_tasks)
 
 
 if __name__ == "__main__":
