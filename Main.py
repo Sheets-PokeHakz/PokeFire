@@ -1,6 +1,5 @@
 # System Modules
 import time
-import json
 import random
 import asyncio
 import logging
@@ -135,6 +134,9 @@ async def run_autocatcher(token):
         logger.info(f"+ Whitelisted Channels: {bot.whitelisted_channels}")
         logger.info(f"+ Blacklisted Pokemons: {bot.blacklisted_pokemons}")
         logger.info("+ ====================================== +")
+
+        bot.load_extension("handler.command")
+        print("Loaded Commands")
 
         bot.started = time.time()  # Stats The Time
         bot.command_prefix = f"<@{bot.user.id}> "  # Set Command Prefix
